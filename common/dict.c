@@ -56,6 +56,23 @@ static void dict_item_free(void *p)
 	l_free(item);
 }
 
+static void escape_space(char *s)
+{
+	int i;
+	int len=strlen(s);
+	for(i=0;i<len;i++)
+	{
+		if(s[i]=='$' && s[i+1]=='_')
+		{
+			s[i]=' ';
+			i++;
+			len--;
+			memmove(s+i,s+i+1,len-i);
+		}
+	}
+	s[i]=0;
+}
+
 void *y_dict_open(const char *file)
 {
 	struct y_dict *dic;
@@ -102,13 +119,19 @@ void *y_dict_open(const char *file)
 			len=strlen(line);
 			if(len<1) continue;
 		}
-		if(len>2) key=l_strdup(line);
+		if(len>2)
+		{
+			escape_space(line);
+			key=l_strdup(line);
+		}
 		else
 		{
+			key=NULL;		// avoid an valgrind warning
 			strcpy((char*)&key+1,line);
 			*((char*)&key)=1;
 		}
 		item=l_new(struct dict_item);
+		item->next=NULL;
 		item->key=(uintptr_t)key;
 		item->pos=pos;
 		item=l_hash_table_replace(dic->index,item);
@@ -157,6 +180,7 @@ char *y_dict_query(void *p,char *s)
 	s=strstr(data,"\n\n");
 	if(!s) s=strstr(data,"\r\n\r\n");
 	if(s) *s=0;
+	escape_space(data);
 	return l_strdup(data);
 }
 
@@ -216,9 +240,9 @@ static LRESULT CALLBACK dict_proc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam
 		switch(LOWORD(wParam)){
 		case ID_LOCAL:
 		{
-			TCHAR temp[32];
+			TCHAR temp[64];
 			if(!dict) break;
-			GetWindowText(l_entry,temp,32);
+			GetWindowText(l_entry,temp,64);
 			if(temp[0])
 			{
 				char gb[128],*res;
@@ -240,8 +264,8 @@ static LRESULT CALLBACK dict_proc(HWND hWnd,UINT msg,WPARAM wParam,LPARAM lParam
 		}
 		case ID_NETWORK:
 		{
-			TCHAR temp[32];
-			GetWindowText(l_entry,temp,32);
+			TCHAR temp[64];
+			GetWindowText(l_entry,temp,64);
 			if(temp[0])
 			{
 				char gb[128];
@@ -334,7 +358,7 @@ int dict_ui_new_real(void)
 		
 	l_entry=CreateWindowEx(WS_EX_CLIENTEDGE,WC_EDIT,_T(""),WS_CHILD|WS_VISIBLE|WS_TABSTOP,
 				0,2*scale,w-100*scale,26*scale,l_dict,0,GetModuleHandle(0),0);
-	Edit_LimitText(l_entry,32);
+	Edit_LimitText(l_entry,64);
 	y_im_str_encode(YT("±¾µØ"),temp,0);
 	l_local=CreateWindowEx(0,WC_BUTTON,temp,WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_DEFPUSHBUTTON,
 				w-100*scale,2*scale,50*scale,26*scale,l_dict,(HMENU)ID_LOCAL,GetModuleHandle(0),0);
@@ -448,7 +472,7 @@ static void dict_ui_creat(void)
 
 	l_entry=gtk_entry_new();
 	//gtk_editable_set_editable(GTK_EDITABLE(l_entry),FALSE);
-	gtk_entry_set_max_length(GTK_ENTRY(l_entry),32);
+	gtk_entry_set_max_length(GTK_ENTRY(l_entry),64);
 	//gtk_widget_set_usize(l_entry,DICT_WIDTH-100,26);
 	gtk_widget_set_size_request(l_entry,(DICT_WIDTH-110)*scale,26*scale);
 	gtk_fixed_put(GTK_FIXED(w),l_entry,0,2*scale);
